@@ -1,1 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NYC Dino Run - Chrome Dino NYC Edition</title>
+    <!-- Google Fonts for Retro and Premium feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app-container">
+        <!-- Background Neon Glow elements -->
+        <div class="neon-glow-bg circle-top"></div>
+        <div class="neon-glow-bg circle-bottom"></div>
 
+        <!-- Header / HUD -->
+        <header id="hud" class="hidden">
+            <div class="hud-left">
+                <div class="hud-item character-avatar" id="hud-avatar">🦖</div>
+                <div class="hud-item score-container">
+                    <span class="hud-label">SCORE</span>
+                    <span id="current-score" class="retro-font">00000</span>
+                </div>
+                <div class="hud-item multiplier-container hidden" id="multiplier-badge">
+                    <span id="multiplier-val">2X</span>
+                </div>
+            </div>
+            
+            <div class="hud-center">
+                <!-- Power-up Bars -->
+                <div class="powerup-bar-container hidden" id="coffee-timer">
+                    <span class="powerup-icon">☕</span>
+                    <div class="bar-outer">
+                        <div class="bar-inner coffee-color" id="coffee-bar"></div>
+                    </div>
+                </div>
+                <div class="powerup-bar-container hidden" id="pizza-timer">
+                    <span class="powerup-icon">🍕</span>
+                    <div class="bar-outer">
+                        <div class="bar-inner pizza-color" id="pizza-bar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hud-right">
+                <div class="hud-item hi-score-container">
+                    <span class="hud-label">HI-SCORE</span>
+                    <span id="high-score" class="retro-font">00000</span>
+                </div>
+                <button id="audio-toggle-btn" class="icon-btn" aria-label="Toggle Sound">
+                    <span id="audio-icon">🔊</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main id="game-viewport">
+            <!-- Retro Title/Menu Screen -->
+            <section id="menu-screen" class="game-overlay">
+                <div class="retro-arcade-card">
+                    <div class="marquee-title">
+                        <h1 class="glitch-text" data-text="NYC DINO RUN">NYC DINO RUN</h1>
+                    </div>
+                    
+                    <p class="subtitle">Dodge the hydrants & traffic. Keep the NYC dream alive!</p>
+
+                    <!-- Character Selector -->
+                    <div class="character-select-section">
+                        <h2>CHOOSE YOUR YORKER</h2>
+                        <div class="character-grid">
+                            <div class="character-card active" data-char="rexy">
+                                <div class="char-preview-box">
+                                    <div class="char-visual" id="visual-rexy">🦖</div>
+                                </div>
+                                <div class="char-info">
+                                    <h3>Rexy</h3>
+                                    <p class="char-desc">Cool Dino with a NY cap & shades. Highly balanced jumper.</p>
+                                    <span class="char-stat">⭐ Jump Height: High</span>
+                                </div>
+                            </div>
+
+                            <div class="character-card" data-char="pizza-rat">
+                                <div class="char-preview-box">
+                                    <div class="char-visual" id="visual-pizzarat">🐀</div>
+                                </div>
+                                <div class="char-info">
+                                    <h3>Pizza Rat</h3>
+                                    <p class="char-desc">Fast scuttler carrying a slice. Hard to hit, double jumps!</p>
+                                    <span class="char-stat">⭐ Jump Height: Medium (Double)</span>
+                                </div>
+                            </div>
+
+                            <div class="character-card" data-char="pigeon-pete">
+                                <div class="char-preview-box">
+                                    <div class="char-visual" id="visual-pigeon">🐦</div>
+                                </div>
+                                <div class="char-info">
+                                    <h3>Pigeon Pete</h3>
+                                    <p class="char-desc">Flaps around trash cans. Can hover briefly in mid-air.</p>
+                                    <span class="char-stat">⭐ Jump Height: Flap/Float</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Area -->
+                    <div class="menu-actions">
+                        <button id="start-btn" class="btn btn-primary btn-glow">
+                            <span>START RUN</span>
+                        </button>
+                    </div>
+
+                    <!-- Instructions Panel -->
+                    <div class="instructions-panel">
+                        <div class="instruction-col">
+                            <strong>KEYBOARD</strong>
+                            <span>Jump: <kbd>SPACE</kbd> / <kbd>▲</kbd> / <kbd>W</kbd></span>
+                            <span>Duck: <kbd>▼</kbd> / <kbd>S</kbd></span>
+                        </div>
+                        <div class="instruction-divider"></div>
+                        <div class="instruction-col">
+                            <strong>TOUCH / MOBILE</strong>
+                            <span>Jump: Tap top-half of screen</span>
+                            <span>Duck: Tap bottom-half of screen</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Game Over Screen -->
+            <section id="gameover-screen" class="game-overlay hidden">
+                <div class="retro-arcade-card gameover-card">
+                    <h2 class="gameover-title">GAME OVER</h2>
+                    <p class="gameover-subtitle">You got stuck in the rush hour!</p>
+
+                    <div class="results-stats">
+                        <div class="stat-box">
+                            <span class="stat-label">SCORE</span>
+                            <span id="final-score" class="retro-font">00000</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">HI-SCORE</span>
+                            <span id="final-hi-score" class="retro-font">00000</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">COFFEE TAKEN</span>
+                            <span id="final-coffee" class="retro-font">0</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-label">PIZZA EATEN</span>
+                            <span id="final-pizza" class="retro-font">0</span>
+                        </div>
+                    </div>
+
+                    <div class="gameover-actions">
+                        <button id="restart-btn" class="btn btn-primary btn-glow">
+                            <span>TRY AGAIN</span>
+                        </button>
+                        <button id="menu-btn" class="btn btn-secondary">
+                            <span>MAIN MENU</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Canvas Container -->
+            <div id="canvas-container">
+                <canvas id="game-canvas" width="900" height="400"></canvas>
+            </div>
+
+            <!-- Mobile Controls Indicator Overlay -->
+            <div id="mobile-touch-zones" class="hidden">
+                <div class="touch-zone touch-zone-jump" id="touch-jump">
+                    <span class="touch-hint">TAP TO JUMP</span>
+                </div>
+                <div class="touch-zone touch-zone-duck" id="touch-duck">
+                    <span class="touch-hint">HOLD TO DUCK</span>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer / Credits -->
+        <footer>
+            <p>Made with love in NYC • Use headphones for dynamic chiptune sound! 🎧</p>
+        </footer>
+    </div>
+
+    <!-- Main Game Script -->
+    <script src="game.js"></script>
+</body>
+</html>
