@@ -610,4 +610,893 @@ class Particle {
         this.size = size;
         this.color = color;
         this.maxLife = maxLife;
-       
+        this.life = maxLife;
+    }
+
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life--;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
+function spawnSteam() {
+    if (Math.random() < 0.25) {
+        let x = CANVAS_WIDTH + 10;
+        let y = GROUND_Y + 15 + Math.random() * 20;
+        let vy = -0.5 - Math.random() * 0.8;
+        let vx = -gameSpeed + (Math.random() - 0.5) * 0.5;
+        let size = 5 + Math.random() * 12;
+        particles.push(new Particle(x, y, vx, vy, size, 'rgba(255, 255, 255, 0.15)', 80));
+    }
+}
+
+function spawnSparks(x, y, color) {
+    for (let i = 0; i < 20; i++) {
+        let vx = (Math.random() - 0.5) * 8;
+        let vy = -3 - Math.random() * 6;
+        let size = 2 + Math.random() * 4;
+        let life = 30 + Math.random() * 20;
+        particles.push(new Particle(x, y, vx, vy, size, color, life));
+    }
+}
+
+// ==========================================
+// 4. CHARACTER / PLAYER CLASS
+// ==========================================
+class Player {
+    constructor(type) {
+        this.type = type;
+        const profile = CHAR_PROFILES[type];
+        
+        this.x = 80;
+        this.y = GROUND_Y - profile.height;
+        this.width = profile.width;
+        this.height = profile.height;
+        this.defaultHeight = profile.height;
+        
+        this.vy = 0;
+        this.jumpForce = profile.jumpForce;
+        this.gravity = profile.gravity;
+        
+        this.isJumping = false;
+        this.isDucking = false;
+        this.doubleJumped = false;
+        
+        this.runFrame = 0;
+        
+        document.getElementById('hud-avatar').innerText = profile.avatar;
+    }
+
+    jump() {
+        if (!this.isJumping) {
+            this.vy = -this.jumpForce;
+            this.isJumping = true;
+            this.doubleJumped = false;
+            soundSystem.playJump();
+        } else if (CHAR_PROFILES[this.type].doubleJumpAllowed && !this.doubleJumped) {
+            this.vy = -this.jumpForce * 0.85;
+            this.doubleJumped = true;
+            soundSystem.playJump();
+            spawnSparks(this.x + this.width / 2, this.y + this.height, '#ffbd00');
+        } else if (CHAR_PROFILES[this.type].canHover) {
+            this.vy = -this.jumpForce * 0.6;
+            soundSystem.playJump();
+        }
+    }
+
+    duck(isCrouching) {
+        if (isCrouching) {
+            if (!this.isDucking && !this.isJumping) {
+                soundSystem.playDuck();
+            }
+            this.isDucking = true;
+            this.height = this.defaultHeight * 0.6;
+        } else {
+            this.isDucking = false;
+            this.height = this.defaultHeight;
+        }
+    }
+
+    update() {
+        let activeGravity = this.gravity;
+        if (activeCoffeeTime > 0) activeGravity *= 0.85;
+
+        this.vy += activeGravity;
+        this.y += this.vy;
+
+        let bottomLimit = GROUND_Y - this.height;
+        if (this.y >= bottomLimit) {
+            this.y = bottomLimit;
+            this.vy = 0;
+            this.isJumping = false;
+            this.doubleJumped = false;
+        }
+
+        if (!this.isJumping) {
+            this.runFrame += gameSpeed * 0.035;
+        }
+
+        if (activeCoffeeTime > 0 && Math.random() < 0.4) {
+            particles.push(new Particle(
+                this.x + Math.random() * this.width,
+                this.y + Math.random() * this.height,
+                -2,
+                -1 + Math.random() * 2,
+                2 + Math.random() * 3,
+                'rgba(255, 42, 133, 0.8)',
+                25
+            ));
+        }
+    }
+
+    draw() {
+        ctx.save();
+        
+        if (activeCoffeeTime > 0) {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff2a85';
+        } else if (activePizzaTime > 0) {
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffbd00';
+        }
+
+        if (this.type === 'rexy') {
+            this.drawRexy();
+        } else if (this.type === 'pizza-rat') {
+            this.drawPizzaRat();
+        } else if (this.type === 'pigeon-pete') {
+            this.drawPigeonPete();
+        }
+
+        ctx.restore();
+    }
+
+    drawRexy() {
+        let isRightFootDown = Math.sin(this.runFrame) > 0;
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = '#00f0ff'; // Teal body
+
+        // Tail
+        ctx.beginPath();
+        ctx.moveTo(0, this.height - 20);
+        ctx.quadraticCurveTo(15, this.height - 15, 25, this.height - 35);
+        ctx.lineTo(25, this.height - 20);
+        ctx.quadraticCurveTo(15, this.height - 5, 0, this.height - 20);
+        ctx.fill();
+
+        ctx.fillRect(15, this.height - 45, 24, 28); // torso
+
+        if (this.isDucking) {
+            ctx.fillRect(25, this.height - 38, 25, 20); // neck
+            ctx.fillRect(35, this.height - 43, 22, 16); // head
+        } else {
+            ctx.fillRect(28, this.height - 58, 12, 20);
+            ctx.fillRect(26, this.height - 64, 28, 16);
+        }
+
+        // Cool sunglasses
+        ctx.fillStyle = '#020108';
+        let sunglassesX = this.isDucking ? 46 : 42;
+        let sunglassesY = this.isDucking ? this.height - 40 : this.height - 61;
+        ctx.fillRect(sunglassesX, sunglassesY, 11, 4);
+        ctx.fillStyle = '#ff2a85';
+        ctx.fillRect(sunglassesX + 4, sunglassesY + 1, 3, 2);
+
+        // Red cap backwards
+        ctx.fillStyle = '#ff2a85';
+        let capX = this.isDucking ? 30 : 28;
+        let capY = this.isDucking ? this.height - 47 : this.height - 68;
+        ctx.beginPath();
+        ctx.arc(capX + 12, capY + 4, 7, Math.PI, 0);
+        ctx.fill();
+        ctx.fillRect(capX + 1, capY + 2, 8, 2); // visor
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(capX + 5, capY + 2, 2, 2);
+
+        // Running Legs
+        ctx.strokeStyle = '#00f0ff';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        
+        ctx.beginPath();
+        ctx.moveTo(22, this.height - 18);
+        ctx.lineTo(this.isJumping ? 18 : (isRightFootDown ? 28 : 16), this.height - 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(32, this.height - 18);
+        ctx.lineTo(this.isJumping ? 34 : (isRightFootDown ? 20 : 36), this.height - 2);
+        ctx.stroke();
+    }
+
+    drawPizzaRat() {
+        let isScuttling = Math.sin(this.runFrame * 1.5) > 0;
+        ctx.translate(this.x, this.y);
+
+        ctx.strokeStyle = '#ffa0bc';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(3, this.height - 12);
+        ctx.quadraticCurveTo(isScuttling ? -10 : -12, isScuttling ? this.height - 18 : this.height - 6, -18, isScuttling ? this.height - 8 : this.height - 14);
+        ctx.stroke();
+
+        ctx.fillStyle = '#8a85a0';
+        ctx.beginPath();
+        ctx.ellipse(25, this.height - 18, 18, 11, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillRect(41, this.height - 19, 5, 4);
+        ctx.fillStyle = '#ffa0bc';
+        ctx.fillRect(44, this.height - 18, 2, 2);
+
+        ctx.fillStyle = '#8a85a0';
+        ctx.beginPath();
+        ctx.arc(28, this.height - 28, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffa0bc';
+        ctx.beginPath();
+        ctx.arc(28, this.height - 28, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#020108';
+        ctx.fillRect(36, this.height - 24, 6, 4);
+
+        ctx.fillStyle = '#ffa0bc';
+        ctx.fillRect(isScuttling ? 15 : 20, this.height - 8, 3, 8);
+        ctx.fillRect(isScuttling ? 22 : 17, this.height - 8, 3, 8);
+        ctx.fillRect(isScuttling ? 30 : 33, this.height - 8, 3, 8);
+
+        // Huge Pizza Slice on Rat's back
+        ctx.save();
+        ctx.translate(12, this.height - 35);
+        ctx.rotate(-0.25);
+        ctx.fillStyle = '#de8812';
+        ctx.fillRect(0, 0, 5, 20);
+        ctx.fillStyle = '#ffd400';
+        ctx.beginPath();
+        ctx.moveTo(5, 0);
+        ctx.lineTo(24, 10);
+        ctx.lineTo(5, 20);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ff2a85';
+        ctx.fillRect(8, 5, 3, 3);
+        ctx.fillRect(14, 9, 3, 3);
+        ctx.fillRect(7, 12, 3, 3);
+        ctx.restore();
+    }
+
+    drawPigeonPete() {
+        let isFlapping = Math.sin(this.runFrame * 1.8) > 0;
+        ctx.translate(this.x, this.y);
+
+        ctx.strokeStyle = '#ff5a00';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(20, this.height - 14);
+        ctx.lineTo(17, this.height - 2);
+        ctx.moveTo(28, this.height - 14);
+        ctx.lineTo(31, this.height - 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#7a869a';
+        ctx.beginPath();
+        ctx.ellipse(24, this.height - 24, 17, 13, 0.1, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#12b070';
+        ctx.fillRect(29, this.height - 35, 9, 7);
+
+        ctx.fillStyle = '#7a869a';
+        ctx.beginPath();
+        ctx.arc(36, this.height - 37, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffbd00';
+        ctx.beginPath();
+        ctx.moveTo(42, this.height - 39);
+        ctx.lineTo(48, this.height - 36);
+        ctx.lineTo(42, this.height - 33);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#020108';
+        ctx.fillRect(36, this.height - 40, 7, 3);
+
+        ctx.fillStyle = '#596375';
+        ctx.beginPath();
+        if (isFlapping || this.isJumping) {
+            ctx.ellipse(15, this.height - 27, 10, 14, -0.6, 0, Math.PI * 2);
+        } else {
+            ctx.ellipse(18, this.height - 23, 11, 8, 0.3, 0, Math.PI * 2);
+        }
+        ctx.fill();
+    }
+}
+
+// ==========================================
+// 5. OBSTACLES CLASS
+// ==========================================
+class Obstacle {
+    constructor(type) {
+        this.type = type;
+        this.x = CANVAS_WIDTH + 50;
+        
+        if (type === 'hydrant') {
+            this.width = 30;
+            this.height = 42 + Math.random() * 12;
+            this.y = GROUND_Y - this.height;
+            this.isSpraying = Math.random() < 0.35;
+        } else if (type === 'cab') {
+            this.width = 75;
+            this.height = 40;
+            this.y = GROUND_Y - this.height;
+            this.speedBoost = 2.5 + Math.random() * 2;
+        } else if (type === 'flying-pigeon') {
+            this.width = 36;
+            this.height = 24;
+            this.y = GROUND_Y - 55 - Math.random() * 25;
+            this.flapSpeed = 0;
+        }
+    }
+
+    update() {
+        let actualSpeed = gameSpeed;
+        if (this.type === 'cab') actualSpeed += this.speedBoost;
+        
+        this.x -= actualSpeed;
+        
+        if (this.type === 'hydrant' && this.isSpraying && Math.random() < 0.25) {
+            particles.push(new Particle(
+                this.x,
+                this.y + 12,
+                -gameSpeed - 2 - Math.random() * 3,
+                -0.5 + Math.random() * 1,
+                2 + Math.random() * 3,
+                'rgba(0, 240, 255, 0.45)',
+                20
+            ));
+        }
+
+        if (this.type === 'flying-pigeon') {
+            this.flapSpeed += 0.2;
+        }
+    }
+
+    draw() {
+        ctx.save();
+        if (this.type === 'hydrant') this.drawHydrant();
+        else if (this.type === 'cab') this.drawCab();
+        else if (this.type === 'flying-pigeon') this.drawFlyingPigeon();
+        ctx.restore();
+    }
+
+    drawHydrant() {
+        ctx.translate(this.x, this.y);
+        ctx.fillStyle = '#ff2a85';
+        
+        ctx.fillRect(0, this.height - 6, this.width, 6);
+        ctx.fillRect(4, 10, this.width - 8, this.height - 16);
+        ctx.beginPath();
+        ctx.arc(this.width / 2, 10, (this.width - 8) / 2, Math.PI, 0);
+        ctx.fill();
+        
+        ctx.fillStyle = '#ffbd00';
+        ctx.fillRect(this.width / 2 - 3, 2, 6, 4);
+        ctx.fillRect(0, 16, 4, 8);
+        ctx.fillRect(this.width - 4, 16, 4, 8);
+        ctx.fillRect(this.width / 2 - 5, 20, 10, 8);
+
+        if (this.isSpraying) {
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.moveTo(-2, 24);
+            ctx.lineTo(-24, 22);
+            ctx.moveTo(-4, 25);
+            ctx.lineTo(-18, 28);
+            ctx.stroke();
+        }
+    }
+
+    drawCab() {
+        ctx.translate(this.x, this.y);
+        
+        ctx.fillStyle = '#ffbd00';
+        ctx.fillRect(0, 15, this.width, 20);
+        ctx.fillRect(20, 3, 38, 14);
+        
+        ctx.fillStyle = '#06050b';
+        ctx.fillRect(24, 6, 14, 9);
+        ctx.fillRect(41, 6, 13, 9);
+
+        ctx.fillStyle = activeCoffeeTime > 0 ? '#ff2a85' : '#ffffff';
+        ctx.fillRect(32, 0, 14, 4);
+        
+        ctx.fillStyle = '#020108';
+        let checkerX = 0;
+        while (checkerX < this.width) {
+            ctx.fillRect(checkerX, 15, 5, 4);
+            checkerX += 10;
+        }
+
+        let wheelRotation = (distance * 0.15) % (Math.PI * 2);
+        
+        const drawWheel = (wx, wy) => {
+            ctx.save();
+            ctx.translate(wx, wy);
+            ctx.rotate(wheelRotation);
+            ctx.fillStyle = '#0a0914';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
+            ctx.moveTo(0, -6); ctx.lineTo(0, 6);
+            ctx.stroke();
+            ctx.restore();
+        };
+
+        drawWheel(16, 33);
+        drawWheel(this.width - 16, 33);
+    }
+
+    drawFlyingPigeon() {
+        let wingFlap = Math.sin(this.flapSpeed) > 0;
+        ctx.translate(this.x, this.y);
+
+        ctx.fillStyle = '#7a869a';
+        ctx.beginPath();
+        ctx.ellipse(this.width / 2, this.height / 2, 14, 8, -0.15, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(10, this.height / 2 - 3, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffbd00';
+        ctx.fillRect(3, this.height / 2 - 4, 3, 2);
+
+        ctx.fillStyle = '#596375';
+        ctx.beginPath();
+        if (wingFlap) {
+            ctx.ellipse(this.width / 2 + 2, this.height / 2 - 8, 6, 12, 0.4, 0, Math.PI * 2);
+        } else {
+            ctx.ellipse(this.width / 2 + 2, this.height / 2 + 6, 6, 12, -0.4, 0, Math.PI * 2);
+        }
+        ctx.fill();
+    }
+}
+
+// ==========================================
+// 6. POWER-UPS CLASS
+// ==========================================
+class PowerUp {
+    constructor() {
+        this.x = CANVAS_WIDTH + 80;
+        this.type = Math.random() < 0.5 ? 'coffee' : 'pizza';
+        this.y = GROUND_Y - 50 - Math.random() * 65;
+        this.width = 30;
+        this.height = 30;
+        this.bobOffset = Math.random() * 100;
+    }
+
+    update() {
+        this.x -= gameSpeed;
+    }
+
+    draw() {
+        ctx.save();
+        let bobY = Math.sin((distance * 0.1) + this.bobOffset) * 5;
+        ctx.translate(this.x, this.y + bobY);
+
+        ctx.beginPath();
+        ctx.arc(15, 15, 18, 0, Math.PI * 2);
+        ctx.fillStyle = this.type === 'coffee' ? 'rgba(255, 110, 0, 0.15)' : 'rgba(255, 230, 0, 0.15)';
+        ctx.fill();
+
+        if (this.type === 'coffee') this.drawCoffee();
+        else this.drawPizza();
+        ctx.restore();
+    }
+
+    drawCoffee() {
+        // Blue & White Greek Anthora Cup
+        ctx.fillStyle = '#007fff';
+        ctx.fillRect(5, 5, 20, 20);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(4, 5, 22, 3);
+        ctx.fillRect(7, 24, 16, 2);
+        ctx.fillStyle = '#ffd400';
+        ctx.fillRect(5, 12, 20, 2);
+        
+        let steamPhase = (distance * 0.08) % 10;
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(10, 2 - steamPhase);
+        ctx.quadraticCurveTo(8, -2 - steamPhase, 10, -5 - steamPhase);
+        ctx.moveTo(18, 2 - steamPhase);
+        ctx.quadraticCurveTo(16, -2 - steamPhase, 18, -5 - steamPhase);
+        ctx.stroke();
+    }
+
+    drawPizza() {
+        ctx.translate(5, 5);
+        ctx.rotate(0.3);
+        ctx.fillStyle = '#de8812';
+        ctx.fillRect(0, 0, 4, 16);
+        ctx.fillStyle = '#ffd400';
+        ctx.beginPath();
+        ctx.moveTo(4, 0);
+        ctx.lineTo(20, 8);
+        ctx.lineTo(4, 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ff2a85';
+        ctx.fillRect(6, 4, 3, 3);
+        ctx.fillRect(11, 7, 3, 3);
+        ctx.fillRect(5, 10, 3, 3);
+    }
+}
+
+// ==========================================
+// 7. COLLISION & LOGIC LOOPS
+// ==========================================
+function checkCollisions() {
+    obstacles.forEach((obs, index) => {
+        let playerBox = {
+            left: player.x + 8,
+            right: player.x + player.width - 8,
+            top: player.y + 6,
+            bottom: player.y + player.height
+        };
+        
+        let obsBox = {
+            left: obs.x + 4,
+            right: obs.x + obs.width - 4,
+            top: obs.y + 4,
+            bottom: obs.y + obs.height
+        };
+
+        if (playerBox.right > obsBox.left &&
+            playerBox.left < obsBox.right &&
+            playerBox.bottom > obsBox.top &&
+            playerBox.top < obsBox.bottom) {
+            
+            if (activeCoffeeTime > 0) {
+                spawnSparks(obs.x + obs.width / 2, obs.y + obs.height / 2, '#00f0ff');
+                soundSystem.playPizza(); // smash
+                obstacles.splice(index, 1);
+                currentScore += 100;
+            } else if (activePizzaTime > 0) {
+                spawnSparks(obs.x + obs.width / 2, obs.y + obs.height / 2, '#ffbd00');
+                soundSystem.playPizza(); // shield smash
+                activePizzaTime = 0;
+                document.getElementById('pizza-timer').classList.add('hidden');
+                obstacles.splice(index, 1);
+            } else {
+                triggerGameOver();
+            }
+        }
+    });
+
+    powerups.forEach((pu, index) => {
+        let playerBox = {
+            left: player.x,
+            right: player.x + player.width,
+            top: player.y,
+            bottom: player.y + player.height
+        };
+
+        let puBox = {
+            left: pu.x,
+            right: pu.x + pu.width,
+            top: pu.y,
+            bottom: pu.y + pu.height
+        };
+
+        if (playerBox.right > puBox.left &&
+            playerBox.left < puBox.right &&
+            playerBox.bottom > puBox.top &&
+            playerBox.top < puBox.bottom) {
+            
+            spawnSparks(pu.x + 15, pu.y + 15, pu.type === 'coffee' ? '#ff9d00' : '#ffe600');
+            
+            if (pu.type === 'coffee') {
+                coffeeCollected++;
+                activeCoffeeTime = COFFEE_DURATION;
+                activePizzaTime = 0;
+                soundSystem.playCoffee();
+                document.getElementById('coffee-timer').classList.remove('hidden');
+                document.getElementById('pizza-timer').classList.add('hidden');
+                document.getElementById('multiplier-badge').classList.remove('hidden');
+            } else {
+                pizzaEaten++;
+                activePizzaTime = PIZZA_DURATION;
+                activeCoffeeTime = 0;
+                soundSystem.playPizza();
+                document.getElementById('pizza-timer').classList.remove('hidden');
+                document.getElementById('coffee-timer').classList.add('hidden');
+                document.getElementById('multiplier-badge').classList.add('hidden');
+            }
+
+            powerups.splice(index, 1);
+        }
+    });
+}
+
+let obstacleSpawnTimer = 0;
+let powerupSpawnTimer = 0;
+
+function spawnGameItems() {
+    obstacleSpawnTimer--;
+    powerupSpawnTimer--;
+
+    if (obstacleSpawnTimer <= 0) {
+        let randomChoice = Math.random();
+        let selectedType = 'hydrant';
+
+        if (randomChoice < 0.45) selectedType = 'hydrant';
+        else if (randomChoice < 0.78) selectedType = 'cab';
+        else selectedType = 'flying-pigeon';
+
+        obstacles.push(new Obstacle(selectedType));
+        obstacleSpawnTimer = 65 + Math.random() * 80 - (gameSpeed * 2);
+    }
+
+    if (powerupSpawnTimer <= 0) {
+        powerups.push(new PowerUp());
+        powerupSpawnTimer = 220 + Math.random() * 180;
+    }
+}
+
+// ==========================================
+// 8. GAME CONTROL FLOW
+// ==========================================
+function startGame() {
+    gameState = 'PLAYING';
+    
+    document.getElementById('menu-screen').classList.add('hidden');
+    document.getElementById('gameover-screen').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+
+    currentScore = 0;
+    distance = 0;
+    gameSpeed = INITIAL_SPEED;
+    coffeeCollected = 0;
+    pizzaEaten = 0;
+    activeCoffeeTime = 0;
+    activePizzaTime = 0;
+    
+    obstacles = [];
+    powerups = [];
+    particles = [];
+    
+    obstacleSpawnTimer = 100;
+    powerupSpawnTimer = 160;
+
+    document.getElementById('coffee-timer').classList.add('hidden');
+    document.getElementById('pizza-timer').classList.add('hidden');
+    document.getElementById('multiplier-badge').classList.add('hidden');
+
+    player = new Player(currentCharacter);
+    createBackgrounds();
+
+    soundSystem.init();
+    soundSystem.startMusic();
+}
+
+function triggerGameOver() {
+    gameState = 'GAMEOVER';
+    soundSystem.stopMusic();
+    soundSystem.playCrash();
+
+    if (currentScore > highScore) {
+        highScore = currentScore;
+        localStorage.setItem('nyc_dino_highscore', highScore);
+        document.getElementById('high-score').innerText = padScore(highScore);
+    }
+
+    document.getElementById('final-score').innerText = padScore(currentScore);
+    document.getElementById('final-hi-score').innerText = padScore(highScore);
+    document.getElementById('final-coffee').innerText = coffeeCollected;
+    document.getElementById('final-pizza').innerText = pizzaEaten;
+
+    document.getElementById('gameover-screen').classList.remove('hidden');
+}
+
+function updateHUD() {
+    distance++;
+    
+    let multiplier = 1;
+    if (activeCoffeeTime > 0) multiplier = 3;
+
+    if (distance % 5 === 0) {
+        currentScore += 1 * multiplier;
+        document.getElementById('current-score').innerText = padScore(currentScore);
+        
+        if (currentScore % 100 === 0 && currentScore > 0) {
+            soundSystem.playPoint();
+        }
+    }
+
+    if (activeCoffeeTime > 0) {
+        activeCoffeeTime--;
+        let ratio = activeCoffeeTime / COFFEE_DURATION;
+        document.getElementById('coffee-bar').style.transform = `scaleX(${ratio})`;
+        if (activeCoffeeTime === 0) {
+            document.getElementById('coffee-timer').classList.add('hidden');
+            document.getElementById('multiplier-badge').classList.add('hidden');
+        }
+    }
+
+    if (activePizzaTime > 0) {
+        activePizzaTime--;
+        let ratio = activePizzaTime / PIZZA_DURATION;
+        document.getElementById('pizza-bar').style.transform = `scaleX(${ratio})`;
+        if (activePizzaTime === 0) {
+            document.getElementById('pizza-timer').classList.add('hidden');
+        }
+    }
+}
+
+function padScore(score) {
+    let str = score.toString();
+    while (str.length < 5) str = '0' + str;
+    return str;
+}
+
+// ==========================================
+// 9. MAIN GAME LOOP
+// ==========================================
+function gameLoop() {
+    if (gameState === 'PLAYING') {
+        if (gameSpeed < MAX_SPEED) {
+            gameSpeed += SPEED_ACCEL;
+        }
+
+        spawnSteam();
+
+        player.update();
+        backgroundLayers.forEach(layer => layer.update());
+        
+        obstacles.forEach((obs, index) => {
+            obs.update();
+            if (obs.x < -obs.width - 20) obstacles.splice(index, 1);
+        });
+
+        powerups.forEach((pu, index) => {
+            pu.update();
+            if (pu.x < -pu.width - 20) powerups.splice(index, 1);
+        });
+
+        particles.forEach((part, index) => {
+            part.update();
+            if (part.life <= 0) particles.splice(index, 1);
+        });
+
+        spawnGameItems();
+        checkCollisions();
+        updateHUD();
+    }
+
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    
+    drawSky();
+    backgroundLayers.forEach(layer => layer.draw());
+    particles.forEach(part => part.draw());
+    drawGround();
+
+    obstacles.forEach(obs => obs.draw());
+    powerups.forEach(pu => pu.draw());
+    
+    if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
+        player.draw();
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// ==========================================
+// 10. EVENTS & BINDINGS SETUP
+// ==========================================
+function setupEventListeners() {
+    window.addEventListener('keydown', (e) => {
+        if (gameState === 'PLAYING') {
+            if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                e.preventDefault();
+                player.jump();
+            }
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                e.preventDefault();
+                player.duck(true);
+            }
+        }
+        
+        if (gameState === 'MENU' && e.code === 'Space') startGame();
+        if (gameState === 'GAMEOVER' && e.code === 'Space') startGame();
+    });
+
+    window.addEventListener('keyup', (e) => {
+        if (gameState === 'PLAYING') {
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                player.duck(false);
+            }
+        }
+    });
+
+    // Touch support (Mobile auto-detect)
+    const touchZones = document.getElementById('mobile-touch-zones');
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        touchZones.classList.remove('hidden');
+    }
+
+    document.getElementById('touch-jump').addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (gameState === 'PLAYING') player.jump();
+    });
+
+    const duckZone = document.getElementById('touch-duck');
+    duckZone.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (gameState === 'PLAYING') player.duck(true);
+    });
+
+    duckZone.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (gameState === 'PLAYING') player.duck(false);
+    });
+
+    // Button actions
+    document.getElementById('start-btn').addEventListener('click', () => startGame());
+    document.getElementById('restart-btn').addEventListener('click', () => startGame());
+    document.getElementById('menu-btn').addEventListener('click', () => {
+        gameState = 'MENU';
+        document.getElementById('gameover-screen').classList.add('hidden');
+        document.getElementById('menu-screen').classList.remove('hidden');
+        document.getElementById('hud').classList.add('hidden');
+    });
+
+    document.getElementById('audio-toggle-btn').addEventListener('click', () => soundSystem.toggleMute());
+
+    // Character cards
+    const cards = document.querySelectorAll('.character-card');
+    cards.forEach(card => {
+        card.addEventListener('click', () => {
+            cards.forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            currentCharacter = card.getAttribute('data-char');
+        });
+    });
+}
+
+// ==========================================
+// 11. INITIALIZATION ON PAGE LOAD
+// ==========================================
+window.addEventListener('DOMContentLoaded', () => {
+    canvas = document.getElementById('game-canvas');
+    ctx = canvas.getContext('2d');
+
+    const savedHighScore = localStorage.getItem('nyc_dino_highscore');
+    if (savedHighScore) {
+        highScore = parseInt(savedHighScore);
+        document.getElementById('high-score').innerText = padScore(highScore);
+    }
+
+    setupEventListeners();
+    createBackgrounds();
+    gameLoop();
+});
